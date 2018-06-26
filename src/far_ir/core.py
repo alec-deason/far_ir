@@ -1,3 +1,7 @@
+from collections import defaultdict
+
+from .linguistics import Thing, there_are_things_here
+
 class ParsingException(Exception):
     pass
 
@@ -25,7 +29,7 @@ def find_target(message, context):
     if message == "here":
         return context.parent
     for potential_target in child_first_ascent(context):
-        for identifier in potential_target.identifiers:
+        for identifier in [potential_target.identifier.primary_noun] + potential_target.secondary_identifiers:
             if identifier in message:
                 return potential_target
     raise ParsingException(f"No object accessible from '{context}' matches '{message}'")
@@ -47,9 +51,12 @@ def parse(message_text, context):
     return verb, target
 
 class GameObject:
-    def __init__(self, identifiers, adjectives=None):
-        self.identifiers = identifiers
+    def __init__(self, identifier, adjectives=None, visible=True, grouping="default"):
+        self.identifier = identifier
+        self.secondary_identifiers = []
         self.adjectives = adjectives
+        self.grouping = grouping
+        self.visible = visible
         self.children = set()
         self.parent = None
 
@@ -57,23 +64,27 @@ class GameObject:
         raise NotImplementedError
 
 class DescribedObject(GameObject):
-    def __init__(self, identifiers, description, embeded_description=None, adjectives=None):
-        super().__init__(identifiers, adjectives)
+    def __init__(self, identifier, description, embeded_description=None, adjectives=None, visible=True, grouping="default"):
+        super().__init__(identifier, adjectives=adjectives, visible=visible, grouping=grouping)
         self.description = description
         self.embeded_description = embeded_description
 
     def handle_message(self, message):
         if message.verb == "examine":
             print(self.description)
-            for child in self.children:
-                if hasattr(child, "embeded_description") and child.embeded_description:
-                    print(child.embeded_description)
+            groups = defaultdict(list)
+            for c in self.children:
+                if c.visible:
+                    groups[c.grouping].append(c.identifier)
+
+            for group in groups.values():
+                print(there_are_things_here(group))
 
 class Exit(GameObject):
-    def __init__(self, identifiers, destination):
-        super().__init__(identifiers)
+    def __init__(self, identifier, destination, visible=True, grouping="exit"):
+        super().__init__(Thing(f"exit to the {identifier}"), visible=visible, grouping=grouping)
+        self.secondary_identifiers.append(identifier)
         self.destination = destination
-        self.embeded_description = f"There is an exit to the {identifiers[0]}"
 
     def handle_message(self, message):
         if message.verb == "go":
