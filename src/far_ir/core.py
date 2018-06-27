@@ -44,6 +44,12 @@ def parse(message_text, context):
     elif message_text.startswith("go "):
         verb = Message("go", context)
         target = find_target(message_text[3:], context)
+    elif message_text.startswith("get "):
+        verb = Message("get", context)
+        target = find_target(message_text[4:], context)
+    elif message_text.startswith("drop "):
+        verb = Message("drop", context)
+        target = find_target(message_text[5:], context)
     elif message_text == "quit":
         raise Exception("Quiting...")
     else:
@@ -62,6 +68,8 @@ class GameObject:
     def handle_message(self, message):
         if message.verb in self.message_handlers:
             self.message_handlers[message.verb](message)
+        else:
+            print("no handler")
 
 def game_loop(player):
     command = "look"

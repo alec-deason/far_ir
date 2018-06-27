@@ -25,6 +25,7 @@ class GOProxy:
         self._handlers = {}
         self._nouns = []
         self._visible = True
+        self._pickable = False
         self._exits = {}
         self._contents = set()
         self.go = GameObject()
@@ -55,6 +56,10 @@ class GOProxy:
         self._contents.update(others)
         return self
 
+    def can_pickup(self, is_pickable):
+        self._pickable = is_pickable
+        return self
+
     def exit(self, name, target):
         self._exits[name] = target
         return self
@@ -68,6 +73,21 @@ class GOProxy:
             go.nouns = [Thing(self.name)]
         go.message_handlers = dict(self._handlers)
         go.children.update([exit(k, objects[v].go if isinstance(v, str) else v.go) for k,v in self._exits.items()])
+        if self._pickable:
+            def drop(message):
+                go.parent = message.sender.parent
+                message.sender.children.remove(go)
+                message.sender.parent.children.add(go)
+                del go.message_handlers["drop"]
+                go.message_handlers["get"] = pickup
+            def pickup(message):
+                go.parent.children.remove(go)
+                go.parent = message.sender
+                message.sender.children.add(go)
+                del go.message_handlers["get"]
+                go.message_handlers["drop"] = drop
+
+            go.message_handlers["get"] = pickup
         for child in {objects[v].go if isinstance(v, str) else v.go for v in self._contents}:
             go.children.add(child)
             child.parent = go
