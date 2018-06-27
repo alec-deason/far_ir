@@ -30,7 +30,7 @@ def find_target(message, context):
         return context.parent
     for potential_target in child_first_ascent(context):
         for identifier in [n.primary_noun for n in potential_target.nouns]:
-            if identifier in message:
+            if identifier == message:
                 return potential_target
     raise ParsingException(f"No object accessible from '{context}' matches '{message}'")
 

@@ -62,7 +62,10 @@ class GOProxy:
     def realize(self, objects):
         go = self.go
         go.visible = self._visible
-        go.nouns = [Thing(n) for n in self._nouns]
+        if self._nouns:
+            go.nouns = [Thing(n) for n in self._nouns]
+        else:
+            go.nouns = [Thing(self.name)]
         go.message_handlers = dict(self._handlers)
         go.children.update([exit(k, objects[v].go if isinstance(v, str) else v.go) for k,v in self._exits.items()])
         for child in {objects[v].go if isinstance(v, str) else v.go for v in self._contents}:
