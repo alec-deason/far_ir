@@ -29,7 +29,7 @@ def find_target(message, context):
     if message == "here":
         return context.parent
     for potential_target in child_first_ascent(context):
-        for identifier in [potential_target.identifier.primary_noun] + potential_target.secondary_identifiers:
+        for identifier in [n.primary_noun for n in potential_target.nouns]:
             if identifier in message:
                 return potential_target
     raise ParsingException(f"No object accessible from '{context}' matches '{message}'")
@@ -51,55 +51,24 @@ def parse(message_text, context):
     return verb, target
 
 class GameObject:
-    def __init__(self, identifier, adjectives=None, visible=True, grouping="default"):
-        self.identifier = identifier
-        self.secondary_identifiers = []
-        self.adjectives = adjectives
-        self.grouping = grouping
-        self.visible = visible
+    def __init__(self):
+        self.visible = True
+        self.grouping = "default"
+        self.nouns = []
         self.children = set()
         self.parent = None
+        self.message_handlers = {}
 
     def handle_message(self, message):
-        raise NotImplementedError
-
-class DescribedObject(GameObject):
-    def __init__(self, identifier, description, embeded_description=None, adjectives=None, visible=True, grouping="default"):
-        super().__init__(identifier, adjectives=adjectives, visible=visible, grouping=grouping)
-        self.description = description
-        self.embeded_description = embeded_description
-
-    def handle_message(self, message):
-        if message.verb == "examine":
-            print(self.description)
-            groups = defaultdict(list)
-            for c in self.children:
-                if c.visible:
-                    groups[c.grouping].append(c.identifier)
-
-            for group in groups.values():
-                print(there_are_things_here(group))
-
-class Exit(GameObject):
-    def __init__(self, identifier, destination, visible=True, grouping="exit"):
-        super().__init__(Thing(f"exit to the {identifier}"), visible=visible, grouping=grouping)
-        self.secondary_identifiers.append(identifier)
-        self.destination = destination
-
-    def handle_message(self, message):
-        if message.verb == "go":
-            message.sender.parent.children.remove(message.sender)
-            self.destination.children.add(message.sender)
-            message.sender.parent = self.destination
-            self.destination.handle_message(Message("examine", message.sender))
-
-
+        if message.verb in self.message_handlers:
+            self.message_handlers[message.verb](message)
 
 def game_loop(player):
+    command = "look"
     while True:
-        command = input()
         try:
             verb, target = parse(command, player)
             target.handle_message(verb)
         except ParsingException as e:
             print(e)
+        command = input()
