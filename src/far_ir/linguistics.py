@@ -20,8 +20,8 @@ def there_are_things_here(things):
             article = "a"
         result.append(f"{article} {thing.primary_noun}")
     else:
+        inner = []
         for thing in things[:-1]:
-            inner = []
             if thing.countable:
                 if thing.primary_noun[0] in "aeiou":
                     article = "an"

@@ -3,12 +3,24 @@ from collections import defaultdict
 from .core import GameObject, Message, game_loop
 from .linguistics import Thing, there_are_things_here
 
-def exit(direction, destination):
+def exit(direction, destination, key=None):
+    if key is None:
+        locked = False
+    else:
+        locked = True
     def exit_handler(message):
-        message.sender.parent.children.remove(message.sender)
-        destination.children.add(message.sender)
-        message.sender.parent = destination
-        destination.handle_message(Message("examine", message.sender))
+        nonlocal locked
+        if not locked or key in message.sender.children:
+            if locked:
+                print(f"You use the {key.nouns[0].primary_noun} to unlock the exit")
+                locked = False
+            print(f"You go {direction}")
+            message.sender.parent.children.remove(message.sender)
+            destination.children.add(message.sender)
+            message.sender.parent = destination
+            destination.handle_message(Message("examine", message.sender))
+        else:
+            print("It's locked")
     def print_description(message):
         print(f"An exit to the {direction}")
 
@@ -26,7 +38,6 @@ class GOProxy:
         self._nouns = []
         self._visible = True
         self._pickable = False
-        self._exits = {}
         self._contents = set()
         self.go = GameObject()
 
@@ -60,10 +71,6 @@ class GOProxy:
         self._pickable = is_pickable
         return self
 
-    def exit(self, name, target):
-        self._exits[name] = target
-        return self
-
     def realize(self, objects):
         go = self.go
         go.visible = self._visible
@@ -72,7 +79,6 @@ class GOProxy:
         else:
             go.nouns = [Thing(self.name)]
         go.message_handlers = dict(self._handlers)
-        go.children.update([exit(k, objects[v].go if isinstance(v, str) else v.go) for k,v in self._exits.items()])
         if self._pickable:
             def drop(message):
                 go.parent = message.sender.parent
@@ -93,11 +99,34 @@ class GOProxy:
             child.parent = go
         return go
 
+class RoomProxy(GOProxy):
+    def __init__(self, name):
+        super().__init__(name)
+        self._exits = {}
+
+    def exit(self, name, target, key=None):
+        self._exits[name] = (target, key)
+        return self
+
+    def realize(self, objects):
+        go = super().realize(objects)
+        for k, (v, l) in self._exits.items():
+            if isinstance(v, str):
+                v = objects[v].go
+            else:
+                v = v.go
+            if l is not None:
+                if isinstance(l, str):
+                    l = objects[l].go
+                else:
+                    l = l.go
+            go.children.add(exit(k, v, l))
+        return go
+
 class Game:
     def __init__(self):
         self._objects = {"player": GOProxy("player")}
         self._objects["player"].visible(False)
-        self.r = self.o
 
     @property
     def p(self):
@@ -106,6 +135,11 @@ class Game:
     def o(self, name):
         if name not in self._objects:
             self._objects[name] = GOProxy(name)
+        return self._objects[name]
+
+    def r(self, name):
+        if name not in self._objects:
+            self._objects[name] = RoomProxy(name)
         return self._objects[name]
 
     def compile(self):
